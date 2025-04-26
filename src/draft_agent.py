@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Dict, Any, Tuple
 from dotenv import load_dotenv
@@ -12,7 +13,7 @@ OPENAI_API=os.getenv("OPENAI_API")
 TAVILY_API=os.getenv("TAVILY_API")
 # Configure API keys
 os.environ["OPENAI_API_KEY"] = OPENAI_API
-
+current_date = datetime.now().strftime("%Y-%m-%d")
 # Define the state schema for our agent system
 class AgentState(BaseModel):
     """State for the research agent system."""
@@ -52,7 +53,7 @@ def draft_answer(state: AgentState) -> AgentState:
     
     formatted_research_results_text = "\n".join(formatted_research_results)
     drafter_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are an expert at synthesizing research into clear, comprehensive answers.
+        ("system", f"""Today's date is {current_date}.You are an expert at synthesizing research into clear, comprehensive answers.
         Based on the provided research results, create a well-structured and informative response that directly addresses the original query.
         At the end of each paragraph or key point, include a citation in this format: [source](URL).
         If multiple results support a point, include up to 2 citations.
@@ -82,7 +83,7 @@ def evaluate_draft(state: AgentState) -> AgentState:
     
 
     evaluator_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You evaluate the quality and completeness of an answer draft.
+        ("system", f"""Today's date is {current_date}.You evaluate the quality and completeness of an answer draft.
         Determine if the draft adequately addresses the original query or if more research is needed.
         If certain aspects of the query remain unaddressed or if the information seems insufficient,
         indicate what additional information would be helpful."""),

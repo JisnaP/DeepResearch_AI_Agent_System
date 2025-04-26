@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Dict, Any, Tuple
 from dotenv import load_dotenv
@@ -15,6 +16,8 @@ TAVILY_API=os.getenv("TAVILY_API")
 # Configure API keys
 os.environ["OPENAI_API_KEY"] = OPENAI_API
 os.environ["TAVILY_API_KEY"] = TAVILY_API
+
+current_date = datetime.now().strftime("%Y-%m-%d")
 # Define the state schema for our agent system
 class AgentState(BaseModel):
     """State for the research agent system."""
@@ -62,7 +65,7 @@ def analyze_research_needs(state: AgentState) -> AgentState:
     
 
     research_analyzer_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a research analyst who evaluates search results.
+        ("system", f"""Today's date is {current_date}.You are a research analyst who evaluates search results.
         Analyze the search results and determine if they adequately address the query.
         If not, generate follow-up questions that would help gather more relevant information."""),
         ("user", "Original Query: {query}"),
