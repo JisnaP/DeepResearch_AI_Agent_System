@@ -1,7 +1,10 @@
 # Deep Research AI Agentic System
 # An implementation of a multi-agent research system using LangChain and LangGraph
 import asyncio
+from datetime import datetime
 import os
+import re
+from urllib.parse import urlparse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Tuple
 from dotenv import load_dotenv
@@ -21,6 +24,7 @@ TAVILY_API=os.getenv("TAVILY_API")
 # Configure API keys
 os.environ["OPENAI_API_KEY"] = OPENAI_API
 os.environ["TAVILY_API_KEY"] = TAVILY_API
+current_date = datetime.now().strftime("%Y-%m-%d")
 
 # Define the state schema for our agent system
 class AgentState(BaseModel):
@@ -35,10 +39,10 @@ class AgentState(BaseModel):
 
 # Initialize LLM models for our agents
 researcher_llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-drafter_llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2)
+drafter_llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.2)
 
 # Initialize the Tavily search tool
-search_tool = TavilySearch(k=8)
+search_tool = TavilySearch(k=8,search_depth='advanced')
 
 # Research Agent Implementation
 async def search_web(state: AgentState) -> AgentState:
@@ -71,7 +75,7 @@ async def analyze_research_needs(state: AgentState) -> AgentState:
     
 
     research_analyzer_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a research analyst who evaluates search results.
+        ("system", f"""Today's date is {current_date}.You are a research analyst who evaluates search results.
         Analyze the search results and determine if they adequately address the query.
         If not, generate follow-up questions that would help gather more relevant information."""),
         ("user", "Original Query: {query}"),
@@ -174,12 +178,14 @@ async def draft_answer(state: AgentState) -> AgentState:
     
     formatted_research_results_text = "\n".join(formatted_research_results)
     drafter_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are an expert at synthesizing research into clear, comprehensive answers.
-        Based on the provided research results, create a well-structured and informative response that directly addresses the original query.
-        At the end of each paragraph or key point, include a citation in this format: [source](URL).
-        If multiple results support a point, include up to 2 citations.
-        Do not invent citations not present in the list below.
-        If the research results don't contain enough information to fully answer the query, note this in your response."""),
+        ("system", f"""Today's date is {current_date}.
+You are an expert at synthesizing research into clear, comprehensive answers.
+Use only the provided research results to answer the query.
+Do not use any external knowledge or make assumptions beyond the provided information.
+At the end of each paragraph or key point, include a citation in this format: [source](URL).
+If multiple results support a point, include up to 2 citations.
+Do not invent citations not present in the list below.
+If the research results don't contain enough information to fully answer the query, state that explicitly."""),
         ("user", "Original Query: {query}"),
         ("user", "Research Results:{formatted_research_results_text}"),
     ])
@@ -204,7 +210,7 @@ async def evaluate_draft(state: AgentState) -> AgentState:
     
 
     evaluator_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You evaluate the quality and completeness of an answer draft.
+        ("system", f"""Today's date is {current_date}.You evaluate the quality and completeness of an answer draft.
         Determine if the draft adequately addresses the original query or if more research is needed.
         If certain aspects of the query remain unaddressed or if the information seems insufficient,
         indicate what additional information would be helpful."""),
@@ -299,7 +305,25 @@ async def finalize_answer(state: AgentState) -> AgentState:
     
     state.final_answer = final_answer
     return state
+def extract_urls_from_draft(draft_answer: str) -> List[str]:
+    url_pattern = r'https?://[^\s\)\]\.,"\']+'  # stop at common closing chars
+    candidates = re.findall(url_pattern, draft_answer)
+    # as a fallback, clean each up:
+    return [url.rstrip(').,;"\']') for url in candidates]
+def normalize(url: str) -> str:
+    p = urlparse(url)
+    hostname = p.hostname.lower().lstrip("www.")
+    path = p.path.rstrip('/')
+    return f"{hostname}{path}"
 
+def validate_citations(state: AgentState) -> AgentState:
+    valid_normed = {normalize(r["url"]) for r in state.research_results}
+    cleaned = state.drafted_answer
+    for url in extract_urls_from_draft(state.drafted_answer):
+        if normalize(url) not in valid_normed:
+            cleaned = cleaned.replace(url, "[Invalid citation removed]")
+    state.drafted_answer = cleaned
+    return state
 # Orchestration with LangGraph
 def create_research_graph() -> StateGraph:
     """Create the LangGraph for orchestrating the research workflow."""
@@ -310,6 +334,7 @@ def create_research_graph() -> StateGraph:
     workflow.add_node("analyze_research_needs", analyze_research_needs)
     workflow.add_node("conduct_follow_up_research", conduct_follow_up_research)
     workflow.add_node("draft_answer", draft_answer)
+    workflow.add_node("validate_citations", validate_citations)
     workflow.add_node("evaluate_draft", evaluate_draft)
     workflow.add_node("finalize_answer", finalize_answer)
     
@@ -323,7 +348,9 @@ def create_research_graph() -> StateGraph:
         "conduct_follow_up_research",
         lambda state: "analyze_research_needs" if not state.research_complete else "draft_answer"
     )
-    workflow.add_edge("draft_answer", "evaluate_draft")
+    workflow.add_edge("draft_answer", "validate_citations")
+    workflow.add_edge("validate_citations", "evaluate_draft")
+
     workflow.add_conditional_edges(
         "evaluate_draft",
         lambda state: "conduct_follow_up_research" if state.needs_more_research else "finalize_answer"
