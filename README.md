@@ -77,6 +77,7 @@ print(answer)
 ```
 ### Example answer 
 
+![Final Answer](https://github.com/JisnaP/DeepResearch_AI_Agent_System/blob/main/final%20answer.png)
 ### License
 
 This project is licensed under the MIT License.
