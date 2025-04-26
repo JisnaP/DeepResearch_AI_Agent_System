@@ -25,7 +25,7 @@ These keys should be stored in a `.env` file in the root directory.
 
 ### 1. Clone the repository:
 ```bash
-git clone https://github.com/JisnaP/deep-research-ai-agent.git
+git clone https://github.com/JisnaP/DeepResearch_AI_Agent_System.git
 cd deep-research-ai-agent
 ```
 ### 2. Create and activate a virtual environment:
