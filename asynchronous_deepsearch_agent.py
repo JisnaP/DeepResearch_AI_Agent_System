@@ -38,7 +38,7 @@ class AgentState(BaseModel):
     research_complete: bool = False
 
 # Initialize LLM models for our agents
-researcher_llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+researcher_llm = ChatOpenAI(model="gpt-4-turbo", temperature=0)
 drafter_llm = ChatOpenAI(model="gpt-4-turbo", temperature=0.2)
 
 # Initialize the Tavily search tool
@@ -173,7 +173,7 @@ async def draft_answer(state: AgentState) -> AgentState:
     for i, result in enumerate(filtered_results):
         content = result.get("content", "")
         url = result.get("url", "")
-        citation = f"[{i+1}]({url})" if url else f"[{i+1}]"
+        citation = f"[{i+1}]({url})"
         formatted_research_results.append(f"{content} {citation}")
     
     formatted_research_results_text = "\n".join(formatted_research_results)
@@ -262,7 +262,7 @@ async def finalize_answer(state: AgentState) -> AgentState:
     for i, (_, result) in enumerate(unique_results.items()):
         content = result.get("content", "")
         url = result.get("url", "")
-        citation = f"[{i+1}]({url})" if url else f"[{i+1}]"
+        citation = f"[{i+1}]({url})"
         formatted_research_results.append(f"{content} {citation}")
     
     formatted_research_results_text = "\n".join(formatted_research_results)
@@ -362,7 +362,7 @@ def create_research_graph() -> StateGraph:
     
     return workflow
 
-# 4. Main Application
+# Main Application
 async def research_agent_system(query: str) -> str:
     """Main function to execute the research agent system."""
     print(f"🚀 Starting research on: {query}")
